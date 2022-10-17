@@ -339,19 +339,31 @@ static void process_args (json_t *options,
         usage (1);
 }
 
+void get_rgraph(std::string &rgraph, json_t* options)
+{
+    const char *load_file = json_string_value(json_object_get(options, "load_file"));
+    if (load_file == NULL) {
+      load_file = "conf/default";
+    }
+    std::ifstream ifs (load_file);
+    rgraph = std::string( (std::istreambuf_iterator<char> (ifs) ),
+                        (std::istreambuf_iterator<char> () ) );
+
+}
 int main (int argc, char *argv[])
 {
     json_t *json_options = json_object();
+    std::string rgraph;
+
     process_args(json_options, argc, argv);
+    get_rgraph(rgraph, json_options);
+
 
     std::string options = json_dumps(json_options, JSON_COMPACT);
 
     std::cout << options << std::endl;
 
     resource_query_t *ctx = nullptr;
-    std::ifstream ifs ("../../t/data/resource/jgfs/tiny.json");
-    std::string rgraph ( (std::istreambuf_iterator<char> (ifs) ),
-                        (std::istreambuf_iterator<char> () ) );
     int match_out, info_out = 0;
 
     try {
