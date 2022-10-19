@@ -15,6 +15,8 @@
 #include <string.h>
 #include <jansson.h>
 #include <boost/filesystem.hpp>
+#include <editline/readline.h>
+#include "resource/utilities/command.hpp"
 
 namespace fs = boost::filesystem;
 using namespace Flux;
@@ -350,6 +352,36 @@ void get_rgraph (std::string &rgraph, json_t* options)
                          (std::istreambuf_iterator<char> () ) );
 
 }
+
+static void control_loop (std::shared_ptr<resource_query_t> &ctx)
+{
+    cmd_func_f *cmd = NULL;
+    while (1) {
+        // char *line = ctx->params.disable_prompt? readline ("")
+        //                                        : readline ("resource-query> ");
+        char *line = readline ("resource-query> ");
+        if (line == NULL)
+            continue;
+        else if (*line)
+            add_history (line);
+
+        std::vector<std::string> tokens;
+        std::istringstream iss (line);
+        std::copy (std::istream_iterator<std::string> (iss),
+                   std::istream_iterator<std::string> (),
+             back_inserter (tokens));
+        free(line);
+        if (tokens.empty ())
+            continue;
+
+        std::string &cmd_str = tokens[0];
+        if (!(cmd = find_cmd (cmd_str)))
+            continue;
+        if (cmd (ctx, tokens) != 0)
+            break;
+    }
+}
+
 int main (int argc, char *argv[])
 {
     json_t *json_options = json_object ();
@@ -366,27 +398,29 @@ int main (int argc, char *argv[])
     resource_query_t *ctx = nullptr;
     int match_out, info_out = 0;
 
-    try {
-        ctx = new resource_query_t (rgraph, options);
-    } catch (std::bad_alloc &e) {
-        errno = ENOMEM;
-        std::cerr << "Memory error\n";
-        return EXIT_FAILURE;
-    } catch (std::runtime_error &e) {
-        errno = EPROTO;
-        std::cerr << ": Runtime error: "
-                     + std::string (e.what ()) + "\n";
-        return EXIT_FAILURE;
-    }
+    control_loop (ctx);
 
-    match_out = match (*ctx);
-    info_out = info (*ctx);
-
-    if (match_out == 0)
-        std::cout << "Match succeeded!\n";
-
-    if (info_out == 0)
-        std::cout << "Info succeeded!\n";
+    // try {
+    //     ctx = new resource_query_t (rgraph, options);
+    // } catch (std::bad_alloc &e) {
+    //     errno = ENOMEM;
+    //     std::cerr << "Memory error\n";
+    //     return EXIT_FAILURE;
+    // } catch (std::runtime_error &e) {
+    //     errno = EPROTO;
+    //     std::cerr << ": Runtime error: "
+    //                  + std::string (e.what ()) + "\n";
+    //     return EXIT_FAILURE;
+    // }
+    //
+    // match_out = match (*ctx);
+    // info_out = info (*ctx);
+    //
+    // if (match_out == 0)
+    //     std::cout << "Match succeeded!\n";
+    //
+    // if (info_out == 0)
+    //     std::cout << "Info succeeded!\n";
 
     return EXIT_SUCCESS;
 }
