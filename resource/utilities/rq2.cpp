@@ -232,25 +232,25 @@ static void process_args (json_t *options,
     int ch = 0;
     std::string token;
 
-    while ((ch = getopt_long (argc, argv, OPTIONS, longopts, NULL)) != -1) {
+    while ( (ch = getopt_long (argc, argv, OPTIONS, longopts, NULL)) != -1) {
         switch (ch) {
             case 'h': /* --help */
                 usage (0);
                 break;
             case 'L': /* --load-file */
-                json_object_set_new(options, "load_file", json_string(optarg));
-                if (!fs::exists(optarg)) {
+                json_object_set_new (options, "load_file", json_string (optarg));
+                if (!fs::exists (optarg)) {
                     std::cerr << "[ERROR] file does not exist for --load-file: ";
                     std::cerr << optarg << std::endl;
                     usage (1);
-                } else if (fs::is_directory(json_string_value(json_object_get(options, "load_file")))) {
+                } else if (fs::is_directory (optarg)) {
                     std::cerr << "[ERROR] path passed to --load-file is a directory: ";
                     std::cerr << optarg << std::endl;
                     usage (1);
                 }
                 break;
             case 'f': /* --load-format */
-                json_object_set_new(options, "load_format", json_string(optarg));
+                json_object_set_new (options, "load_format", json_string (optarg));
                 if (!known_resource_reader (optarg)) {
                     std::cerr << "[ERROR] unknown format for --load-format: ";
                     std::cerr << optarg << std::endl;
@@ -259,24 +259,24 @@ static void process_args (json_t *options,
                 break;
             case 'W': /* --hwloc-allowlist */
                 token = optarg;
-                if(token.find_first_not_of(' ') != std::string::npos) {
-                    if (!json_object_get(options,"load_allowlist")){
-                        json_object_set_new(options, "load_allowlist", json_string(""));
+                if (token.find_first_not_of (' ') != std::string::npos) {
+                    if (!json_object_get (options,"load_allowlist")){
+                        json_object_set_new (options, "load_allowlist", json_string (""));
                     }
-                    json_object_set_new(options, "load_allowlist",
-                                        json_pack("s++",
-                                        json_object_get(options,"load_allowlist"),
-                                         "cluster,", token.c_str()));
+                    json_object_set_new (options, "load_allowlist",
+                                        json_pack ("s++",
+                                        json_object_get (options,"load_allowlist"),
+                                         "cluster,", token.c_str ()));
                 }
                 break;
             case 'S': /* --match-subsystems */
-                json_object_set_new(options, "matcher_name", json_string(optarg));
+                json_object_set_new (options, "matcher_name", json_string (optarg));
                 break;
             case 'P': /* --match-policy */
-                json_object_set_new(options, "matcher_policy", json_string(optarg));
+                json_object_set_new (options, "matcher_policy", json_string (optarg));
                 break;
             case 'F': /* --match-format */
-                json_object_set_new(options, "match_format", json_string(optarg));
+                json_object_set_new (options, "match_format", json_string (optarg));
                 if (!known_match_format (optarg)) {
                     std::cerr << "[ERROR] unknown format for --match-format: ";
                     std::cerr << optarg << std::endl;
@@ -297,14 +297,14 @@ static void process_args (json_t *options,
             //     break;
             case 'p': /* --prune-filters */
                 token = optarg;
-                if(token.find_first_not_of(' ') != std::string::npos) {
-                    if (!json_object_get(options,"prune_filters")){
-                        json_object_set_new(options, "prune_filters", json_string(token.c_str()));
+                if (token.find_first_not_of (' ') != std::string::npos) {
+                    if (!json_object_get (options,"prune_filters")){
+                        json_object_set_new (options, "prune_filters", json_string (token.c_str ()));
                     }else{
-                      json_object_set_new(options, "prune_filters",
-                                          json_pack("s++",
-                                          json_object_get(options,"prune_filters"),
-                                           ",", token.c_str()));
+                      json_object_set_new (options, "prune_filters",
+                                          json_pack ("s++",
+                                          json_object_get (options,"prune_filters"),
+                                           ",", token.c_str ()));
                     }
 
                 }
@@ -314,10 +314,10 @@ static void process_args (json_t *options,
             //     break;
             case 'r': /* --reserve-vtx-vec */
                 // If atoi fails, it defaults to 0, which is fine for us
-                json_object_set_new(options, "match_format", json_integer(atoi(optarg)));
-                if ( (atoi(optarg) < 0)
-                    || (atoi(optarg) > 2000000)) {
-                    json_object_set_new(options, "match_format", json_integer(0));
+                json_object_set_new (options, "match_format", json_integer (atoi (optarg)));
+                if ( (atoi (optarg) < 0)
+                    || (atoi (optarg) > 2000000)) {
+                    json_object_set_new (options, "match_format", json_integer (0));
                     std::cerr
                         << "WARN: out of range specified for --reserve-vtx-vec: ";
                     std::cerr << optarg << std::endl;
@@ -339,27 +339,27 @@ static void process_args (json_t *options,
         usage (1);
 }
 
-void get_rgraph(std::string &rgraph, json_t* options)
+void get_rgraph (std::string &rgraph, json_t* options)
 {
-    const char *load_file = json_string_value(json_object_get(options, "load_file"));
+    const char *load_file = json_string_value (json_object_get (options, "load_file"));
     if (load_file == NULL) {
       load_file = "conf/default";
     }
     std::ifstream ifs (load_file);
-    rgraph = std::string( (std::istreambuf_iterator<char> (ifs) ),
-                        (std::istreambuf_iterator<char> () ) );
+    rgraph = std::string ( (std::istreambuf_iterator<char> (ifs) ),
+                         (std::istreambuf_iterator<char> () ) );
 
 }
 int main (int argc, char *argv[])
 {
-    json_t *json_options = json_object();
+    json_t *json_options = json_object ();
     std::string rgraph;
 
-    process_args(json_options, argc, argv);
-    get_rgraph(rgraph, json_options);
+    process_args (json_options, argc, argv);
+    get_rgraph (rgraph, json_options);
 
 
-    std::string options = json_dumps(json_options, JSON_COMPACT);
+    std::string options = json_dumps (json_options, JSON_COMPACT);
 
     std::cout << options << std::endl;
 
