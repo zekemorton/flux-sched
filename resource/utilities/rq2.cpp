@@ -230,6 +230,7 @@ int match (resource_query_t &ctx, std::vector<std::string> &args)
     bool reserved = false;
     std::string R = "";
     double ov = 0.0;
+    std::stringstream o;
 
     if (args.size () != 3) {
         std::cerr << "ERROR: malformed command" << std::endl;
@@ -259,6 +260,11 @@ int match (resource_query_t &ctx, std::vector<std::string> &args)
                         (std::istreambuf_iterator<char> () ) );
 
     rc = reapi_cli_t::match_allocate (&ctx, orelse_reserve, jobspec, jobid, reserved, R, at, ov);
+
+    ctx.writers->emit (o);
+
+    std::cout << R << std::endl;
+
 
 //    } catch (parse_error &e) {
 //        std::cerr << "ERROR: Jobspec error for " << ctx->jobid_counter <<": "
