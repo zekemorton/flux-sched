@@ -69,8 +69,8 @@ command_t commands[] = {
 //     { "find", "f", cmd_find, "Find resources matched with criteria "
 // "(predicates: status={up|down} sched-now={allocated|free} sched-future={reserved|free}): "
 // "resource-query> find status=down and sched-now=allocated" },
-//     { "cancel", "c", cmd_cancel, "Cancel an allocation or reservation: "
-// "resource-query> cancel jobid" },
+    { "cancel", "c", cancel, "Cancel an allocation or reservation: "
+"resource-query> cancel jobid" },
 //     { "set-property", "p", cmd_set_property, "Add a property to a resource: "
 // "resource-query> set-property resource PROPERTY=VALUE" },
 // { "get-property", "g", cmd_get_property, "Get all properties of a resource: "
@@ -349,6 +349,26 @@ int match (resource_query_t &ctx, std::vector<std::string> &args)
     return rc;
 }
 
+int cancel (resource_query_t &ctx, std::vector<std::string> &args)
+{
+    int rc = -1;
+    if (args.size () != 2) {
+        std::cerr << "ERROR: malformed command" << std::endl;
+        return 0;
+    }
+
+    std::string jobid_str = args[1];
+    uint64_t jobid = (uint64_t)std::strtoll (jobid_str.c_str (), NULL, 10);
+
+    rc = reapi_cli_t::cancel (&ctx, jobid, false);
+
+    if (rc != 0){
+      std::cout << reapi_cli_t::get_err_message ();
+    }
+
+    return 0;
+}
+
 int info (resource_query_t &ctx, std::vector<std::string> &args)
 {
     if (args.size () != 2) {
@@ -371,8 +391,12 @@ int info (resource_query_t &ctx, std::vector<std::string> &args)
 
     rc = reapi_cli_t::info (&ctx, jobid, mode, reserved, at, overhead);
 
-    std::cout << "Info outputs: " << jobid << " " << mode << " " << reserved << " " << at << " " << overhead << " \n";
-    std::cout << reapi_cli_t::get_err_message () << "\n";
+    if (rc == 0){
+      std::cout << "Info outputs: " << jobid << " " << mode << " " << reserved << " " << at << " " << overhead << " \n";
+    }else {
+      std::cout << reapi_cli_t::get_err_message () << "\n";
+    }
+
 
     return rc;
 }

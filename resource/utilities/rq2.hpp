@@ -23,3 +23,4 @@ int match (resource_query_t &ctx, std::vector<std::string> &args);
 int info (resource_query_t &ctx, std::vector<std::string> &args);
 int help (resource_query_t &ctx, std::vector<std::string> &args);
 int quit (resource_query_t &ctx, std::vector<std::string> &args);
+int cancel (resource_query_t &ctx, std::vector<std::string> &args);
