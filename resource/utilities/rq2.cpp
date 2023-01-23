@@ -222,13 +222,6 @@ static void usage (int code)
     exit (code);
 }
 
-double get_elapse_time (timeval &st, timeval &et)
-{
-    double ts1 = (double)st.tv_sec + (double)st.tv_usec/1000000.0f;
-    double ts2 = (double)et.tv_sec + (double)et.tv_usec/1000000.0f;
-    return ts2 - ts1;
-}
-
 static void print_schedule_info (resource_query_t &ctx,
                                  std::ostream &out, uint64_t jobid,
                                  const std::string &jobspec_fn, bool matched,
@@ -330,7 +323,7 @@ int match (resource_query_t &ctx, std::vector<std::string> &args)
     if ((rc != 0) && (errno == ENODEV))
         sat = false;
 
-    elapse = get_elapse_time (st, et);
+    elapse = get_elapsed_time (st, et);
 
     out << R;
 
