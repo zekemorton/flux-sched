@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include <unistd.h>
 #include <jansson.h>
+#include <cstdlib>
 #include "resource/readers/resource_reader_jgf.hpp"
 #include "resource/store/resource_graph_store.hpp"
 #include "resource/planner/planner.h"
@@ -282,7 +283,7 @@ int resource_reader_jgf_t::unpack_and_remap_vtx (fetch_helper_t &f,
         m_err_msg += std::to_string (f.rank) + ".\n";
         goto error;
     }
-    if (remap_rank 
+    if (remap_rank
             > static_cast<uint64_t> (std::numeric_limits<int64_t>::max ())) {
         errno = EOVERFLOW;
         m_err_msg += __FUNCTION__;
@@ -298,7 +299,7 @@ int resource_reader_jgf_t::unpack_and_remap_vtx (fetch_helper_t &f,
             m_err_msg += " rank=" + std::to_string (f.rank) + ".\n";
             goto error;
         }
-        if (remap_id 
+        if (remap_id
                 > static_cast<uint64_t> (std::numeric_limits<int>::max ())) {
             errno = EOVERFLOW;
             m_err_msg += __FUNCTION__;
@@ -457,7 +458,7 @@ done:
 
 vtx_t resource_reader_jgf_t::vtx_in_graph (const resource_graph_t &g,
                                            const resource_graph_metadata_t &m,
-                                           const std::map<std::string, 
+                                           const std::map<std::string,
                                                           std::string> &paths,
                                            int rank)
 {
@@ -528,17 +529,52 @@ done:
     return rc;
 }
 
-int resource_reader_jgf_t::update_vmap (std::map<std::string, 
+int resource_reader_jgf_t::remove_graph_metadata (vtx_t v,
+                                                  resource_graph_t &g,
+                                                  resource_graph_metadata_t &m)
+{
+    int rc = -1;
+    for (auto kv : g[v].paths) {
+        m.by_path.erase(kv.second);
+    }
+    
+    for (auto it = m.by_type[g[v].type].begin(); it != m.by_type[g[v].type].end(); ++it){
+        if (*it == v){
+            m.by_type[g[v].type].erase(it);
+            break;
+        }
+    }
+
+    for (auto it = m.by_name[g[v].name].begin(); it != m.by_name[g[v].name].end(); ++it){
+        if (*it == v){
+            m.by_name[g[v].name].erase(it);
+            break;
+        }
+    }
+
+    for (auto it = m.by_rank[g[v].rank].begin(); it != m.by_rank[g[v].rank].end(); ++it){
+        if (*it == v){
+            m.by_rank[g[v].rank].erase(it);
+            break;
+        }
+    }
+
+    rc = 0;
+
+    return rc;
+}
+
+int resource_reader_jgf_t::update_vmap (std::map<std::string,
                                                  vmap_val_t> &vmap,
-                                        vtx_t v, 
-                                        const std::map<std::string, 
+                                        vtx_t v,
+                                        const std::map<std::string,
                                                        bool> &root_checks,
                                         const fetch_helper_t &fetcher)
 {
     int rc = -1;
     std::pair<std::map<std::string, vmap_val_t>::iterator, bool> ptr;
-    ptr = vmap.emplace (std::string (fetcher.vertex_id), 
-                        vmap_val_t{v, root_checks, 
+    ptr = vmap.emplace (std::string (fetcher.vertex_id),
+                        vmap_val_t{v, root_checks,
                         static_cast<unsigned int> (fetcher.size),
                         static_cast<unsigned int> (fetcher.exclusive)});
     if (!ptr.second) {
@@ -776,7 +812,7 @@ int resource_reader_jgf_t::unpack_vertices (resource_graph_t &g,
                                             resource_graph_metadata_t &m,
                                             std::map<std::string,
                                                      vmap_val_t> &vmap,
-                                            json_t *nodes, 
+                                            json_t *nodes,
                                             std::unordered_set<std::string>
                                             &added_vtcs)
 {
@@ -894,7 +930,7 @@ int resource_reader_jgf_t::unpack_edges (resource_graph_t &g,
                                          resource_graph_metadata_t &m,
                                          std::map<std::string,
                                                   vmap_val_t> &vmap,
-                                         json_t *edges, 
+                                         json_t *edges,
                                          const std::unordered_set
                                          <std::string> &added_vtcs)
 {
@@ -914,7 +950,7 @@ int resource_reader_jgf_t::unpack_edges (resource_graph_t &g,
         if ( (unpack_edge (element, vmap, source, target, &name)) != 0)
             goto done;
         // We only add the edge when it connects at least one newly added vertex
-        if ( (added_vtcs.count (source) == 1) 
+        if ( (added_vtcs.count (source) == 1)
               || (added_vtcs.count (target) == 1)) {
             tie (e, inserted) = add_edge (vmap[source].v, vmap[target].v, g);
             if (inserted == false) {
@@ -1053,6 +1089,34 @@ done:
     return rc;
 }
 
+int resource_reader_jgf_t::get_subgraph_nodes (resource_graph_t &g,
+                                               vtx_t node,
+                                               std::vector<vtx_t> &node_list)
+{
+    vtx_t next_node;
+    boost::graph_traits<resource_graph_t>::out_edge_iterator ei, ei_end;
+    boost::tie (ei, ei_end) = boost::out_edges (node, g);
+
+    for (; ei != ei_end; ++ei) {
+        next_node =  boost::target (*ei, g);
+        
+        for (auto const &paths_it : g[next_node].paths) {
+            if (paths_it.second.find(g[node].name) !=std::string::npos &&
+                paths_it.second.find(g[node].name) < paths_it.second.find(g[next_node].name)) {
+                
+                node_list.push_back(next_node);
+                get_subgraph_nodes(g, next_node, node_list);
+                break;
+            }
+
+        }
+            
+
+  }
+
+  return 0;
+}
+
 
 /********************************************************************************
  *                                                                              *
@@ -1099,12 +1163,12 @@ int resource_reader_jgf_t::unpack_at (resource_graph_t &g,
                                       resource_graph_metadata_t &m, vtx_t &vtx,
                                       const std::string &str, int rank)
 {
-    /* This functionality is currently experimental, as resource graph 
-     * growth causes a resize of the boost vecS vertex container type. 
-     * Resizing the vecS results in lost job allocations and reservations 
+    /* This functionality is currently experimental, as resource graph
+     * growth causes a resize of the boost vecS vertex container type.
+     * Resizing the vecS results in lost job allocations and reservations
      * as there is no copy constructor for planner.
-     * vtx_t vtx is not implemented and may be used in the future 
-     * for optimization. 
+     * vtx_t vtx is not implemented and may be used in the future
+     * for optimization.
      */
 
     return unpack (g, m, str, rank);
@@ -1142,6 +1206,42 @@ int resource_reader_jgf_t::update (resource_graph_t &g,
 done:
     json_decref (jgf);
     return rc;
+}
+
+int resource_reader_jgf_t::remove_subgraph (resource_graph_t &g,
+                                            resource_graph_metadata_t &m,
+                                            const std::string &path)
+{
+    vtx_t my_vtx = boost::graph_traits<resource_graph_t>::null_vertex ();
+    std::vector<vtx_t> node_list;
+
+    auto iter = m.by_path.find (path);
+    if (iter == m.by_path.end ()) {
+        return -1;
+    }
+
+    // why and when would there be more than one element in the by_path vector of nodes?
+    for (auto &v : iter->second) {
+        my_vtx = v;
+    }
+
+    node_list.push_back(my_vtx);
+
+    get_subgraph_nodes(g, my_vtx, node_list);
+
+    for (auto & node : node_list)
+    {   
+        remove_graph_metadata(node, g, m);
+    }
+
+    for (auto & node : node_list)
+    {  
+        boost::clear_vertex(node, g);
+        // boost::remove_vertex(node, g);
+    }
+
+    return 0;
+
 }
 
 bool resource_reader_jgf_t::is_allowlist_supported ()
