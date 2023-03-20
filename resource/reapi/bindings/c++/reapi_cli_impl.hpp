@@ -480,8 +480,8 @@ resource_query_t::resource_query_t (const std::string &rgraph,
         throw std::runtime_error (tmp_err);
     }
 
-    if (params.reserve_vtx_vec != 0)
-        db->resource_graph.m_vertices.reserve (params.reserve_vtx_vec);
+    // if (params.reserve_vtx_vec != 0)
+    //     db->resource_graph.m_vertices.reserve (params.reserve_vtx_vec);
 
     if ( (rd = create_resource_reader (params.load_format)) == nullptr) {
         tmp_err = __FUNCTION__;

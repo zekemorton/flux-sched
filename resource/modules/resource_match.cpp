@@ -1298,9 +1298,9 @@ static int populate_resource_db (std::shared_ptr<resource_ctx_t> &ctx)
     double elapse;
     struct timeval st, et;
 
-    if (ctx->opts.get_opt ().is_reserve_vtx_vec_set ())
-        ctx->db->resource_graph.m_vertices.reserve (
-            ctx->opts.get_opt ().get_reserve_vtx_vec ());
+    // if (ctx->opts.get_opt ().is_reserve_vtx_vec_set ())
+    //     ctx->db->resource_graph.m_vertices.reserve (
+    //         ctx->opts.get_opt ().get_reserve_vtx_vec ());
     if ( (rc = gettimeofday (&st, NULL)) < 0) {
         flux_log_error (ctx->h, "%s: gettimeofday", __FUNCTION__);
         goto done;

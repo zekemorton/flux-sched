@@ -233,7 +233,7 @@ vtx_t dfs_emitter_t::emit_vertex (ggv_t u, gge_t e, const gg_t &recipe,
     g[v].name = recipe[u].basename + istr;
     g[v].paths[ssys] = pref + "/" + g[v].name;
     g[v].idata.member_of[ssys] = "*";
-    g[v].uniq_id = v;
+    g[v].uniq_id = 42;
     g[v].rank = m_rank;
 
     //

@@ -83,7 +83,7 @@ vtx_t resource_reader_hwloc_t::add_new_vertex (resource_graph_t &g,
     g[v].type = type;
     g[v].basename = basename;
     g[v].size = size;
-    g[v].uniq_id = v;
+    g[v].uniq_id = 42;
     g[v].rank = rank;
     g[v].schedule.plans = planner_new (0, INT64_MAX, size, type.c_str ());
     g[v].idata.x_checker = planner_new (0, INT64_MAX,

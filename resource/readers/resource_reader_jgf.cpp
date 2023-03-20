@@ -675,7 +675,7 @@ int resource_reader_jgf_t::find_vtx (resource_graph_t &g,
             m_err_msg += __FUNCTION__;
             m_err_msg += ": inconsistent input vertex for " + kv.second;
             m_err_msg += " (id=" + std::string (fetcher.vertex_id) + ").\n";
-            m_err_msg += std::to_string (u) + " != " + std::to_string (v) + ".\n";
+            m_err_msg +=  "vetex descriptors do not match.\n";
             goto done;
         }
     }
@@ -1237,7 +1237,7 @@ int resource_reader_jgf_t::remove_subgraph (resource_graph_t &g,
     for (auto & node : node_list)
     {  
         boost::clear_vertex(node, g);
-        // boost::remove_vertex(node, g);
+        boost::remove_vertex(node, g);
     }
 
     return 0;

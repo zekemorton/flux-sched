@@ -110,7 +110,7 @@ vtx_t resource_reader_rv1exec_t::add_vertex (resource_graph_t &g,
     g[v].type = type;
     g[v].basename = basename;
     g[v].size = size;
-    g[v].uniq_id = v;
+    g[v].uniq_id = 42;
     g[v].rank = rank;
     g[v].schedule.plans = plan;
     g[v].idata.x_checker = x_checker;
