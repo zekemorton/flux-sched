@@ -8,8 +8,8 @@
  * SPDX-License-Identifier: LGPL-3.0
 \*****************************************************************************/
 
-#include "resource/hlapi/bindings/c++/reapi_cli.hpp"
-#include "resource/hlapi/bindings/c++/reapi_cli_impl.hpp"
+#include "resource/reapi/bindings/c++/reapi_cli.hpp"
+#include "resource/reapi/bindings/c++/reapi_cli_impl.hpp"
 #include "rq2.hpp"
 #include <cerrno>
 #include <getopt.h>
@@ -57,10 +57,10 @@ command_t commands[] = {
 "allocate | allocate_with_satisfiability | allocate_orelse_reserve) | "
 "satisfiability: "
 "resource-query> match allocate jobspec"},
-//     { "multi-match",  "M", cmd_match_multi, "Allocate or reserve for "
-// "multiple jobspecs (subcmd: allocate | allocate_with_satisfiability | "
-// "allocate_orelse_reserve): "
-// "resource-query> multi-match allocate jobspec1 jobspec2 ..."},
+    { "multi-match",  "M", match_multi, "Allocate or reserve for "
+"multiple jobspecs (subcmd: allocate | allocate_with_satisfiability | "
+"allocate_orelse_reserve): "
+"resource-query> multi-match allocate jobspec1 jobspec2 ..."},
 //     { "update", "u", cmd_update, "Update resources with a JGF subgraph (subcmd: "
 // "allocate | reserve): "
 // "resource-query> update allocate jgf_file jobid starttime duration" },
@@ -342,6 +342,82 @@ int match (resource_query_t &ctx, std::vector<std::string> &args)
     return rc;
 }
 
+int match_multi (resource_query_t &ctx, std::vector<std::string> &args)
+{
+    int rc = -1;
+    int64_t at = 0;
+    bool orelse_reserve = false;
+    bool reserved = false;
+    bool sat = true;
+    std::string R = "";
+    double ov = 0.0;
+    double elapse = 0.0f;
+    std::stringstream o;
+    std::ostream &out = std::cout;
+    struct timeval st, et;
+
+    if ( (rc = gettimeofday (&st, NULL)) < 0) {
+        std::cerr << "ERROR: gettimeofday: " << strerror (errno) << std::endl;
+        return 0;
+    }
+
+    if (args.size () <= 3) {
+        std::cerr << "ERROR: malformed command" << std::endl;
+        return 0;
+    }
+    std::string subcmd = args[1];
+    if (!(subcmd == "allocate" || subcmd == "allocate_orelse_reserve"
+          || subcmd == "allocate_with_satisfiability"
+          || subcmd == "satisfiability")) {
+        std::cerr << "ERROR: unknown subcmd " << args[1] << std::endl;
+        return 0;
+    }
+
+    if (subcmd == "allocate_orelse_reserve") {
+        orelse_reserve = true;
+    }
+
+    for (int i = 2; i < args.size (); i++) {
+        uint64_t jobid = ctx.get_job_counter ();
+        std::string &jobspec_fn = args[i];
+        std::ifstream jobspec_in (jobspec_fn);
+        if (!jobspec_in) {
+            std::cerr << "ERROR: can't open " << jobspec_fn << std::endl;
+            return 0;
+        }
+        std::string jobspec ( (std::istreambuf_iterator<char> (jobspec_in) ),
+                            (std::istreambuf_iterator<char> () ) );
+
+        jobspec_in.close ();
+
+        rc = reapi_cli_t::match_allocate (&ctx, orelse_reserve, jobspec, jobid, reserved, R, at, ov);
+
+        if ((rc != 0) && (errno == ENODEV))
+            sat = false;
+
+        elapse = get_elapsed_time (st, et);
+
+        out << R;
+
+        if ( (rc = gettimeofday (&et, NULL)) < 0) {
+            std::cerr << "ERROR: gettimeofday: " << strerror (errno) << std::endl;
+            return 0;
+        }
+
+        if (subcmd != "satisfiability")
+            print_schedule_info (ctx, out, jobid,
+                                jobspec_fn, rc == 0, at, sat,
+                                elapse);
+
+        
+
+        if (rc < 0)
+            return 0;
+    }
+
+    return 0;
+}
+
 int cancel (resource_query_t &ctx, std::vector<std::string> &args)
 {
     int rc = -1;
@@ -613,8 +689,6 @@ int main (int argc, char *argv[])
 
 
     std::string options = json_dumps (json_options, JSON_COMPACT);
-
-    std::cout << options << std::endl;
 
     resource_query_t *ctx = nullptr;
     int match_out, info_out = 0;
