@@ -66,9 +66,9 @@ command_t commands[] = {
 // "resource-query> update allocate jgf_file jobid starttime duration" },
 //     { "attach", "j", cmd_attach, "Experimental: attach a JGF subgraph to the "
 // "resource graph: resource-query> attach jgf_file" },
-//     { "find", "f", cmd_find, "Find resources matched with criteria "
-// "(predicates: status={up|down} sched-now={allocated|free} sched-future={reserved|free}): "
-// "resource-query> find status=down and sched-now=allocated" },
+    { "find", "f", find, "Find resources matched with criteria "
+"(predicates: status={up|down} sched-now={allocated|free} sched-future={reserved|free}): "
+"resource-query> find status=down and sched-now=allocated" },
     { "cancel", "c", cancel, "Cancel an allocation or reservation: "
 "resource-query> cancel jobid" },
 //     { "set-property", "p", cmd_set_property, "Add a property to a resource: "
@@ -228,7 +228,7 @@ static void print_schedule_info (resource_query_t &ctx,
                                  int64_t at, bool sat, double elapse)
 {
     if (matched) {
-        job_lifecycle_t st;
+        // job_lifecycle_t st;
         std::string mode = (at == 0)? "ALLOCATED" : "RESERVED";
         std::string scheduled_at = (at == 0)? "Now" : std::to_string (at);
         out << "INFO:" << " =============================" << std::endl;
@@ -245,7 +245,7 @@ static void print_schedule_info (resource_query_t &ctx,
         // }
 
         out << "INFO:" << " =============================" << std::endl;
-        st = (at == 0)? job_lifecycle_t::ALLOCATED : job_lifecycle_t::RESERVED;
+        // st = (at == 0)? job_lifecycle_t::ALLOCATED : job_lifecycle_t::RESERVED;
         // ctx->jobs[jobid] = std::make_shared<job_info_t> (jobid, st, at,
         //                                                  jobspec_fn,
         //                                                  "", elapse);
@@ -272,7 +272,7 @@ static void print_schedule_info (resource_query_t &ctx,
     // ctx->jobid_counter++;
 }
 
-int match (resource_query_t &ctx, std::vector<std::string> &args)
+int execute_allocate(resource_query_t &ctx, std::vector<std::string> &args, std::string &subcmd, std::string &jobspec_fn)
 {
     int rc = -1;
     int64_t at = 0;
@@ -286,134 +286,128 @@ int match (resource_query_t &ctx, std::vector<std::string> &args)
     std::ostream &out = std::cout;
     struct timeval st, et;
 
-    if ( (rc = gettimeofday (&st, NULL)) < 0) {
-        std::cerr << "ERROR: gettimeofday: " << strerror (errno) << std::endl;
+    if ((rc = gettimeofday(&st, NULL)) < 0)
+    {
+        std::cerr << "ERROR: gettimeofday: " << strerror(errno) << std::endl;
         return 0;
     }
 
-    if (args.size () != 3) {
-        std::cerr << "ERROR: malformed command" << std::endl;
-        return 0;
-    }
-    std::string subcmd = args[1];
     if (!(subcmd == "allocate" || subcmd == "allocate_orelse_reserve"
           || subcmd == "allocate_with_satisfiability"
-          || subcmd == "satisfiability")) {
-        std::cerr << "ERROR: unknown subcmd " << args[1] << std::endl;
+          || subcmd == "satisfiability"))
+    {
+        std::cerr << "ERROR: unknown subcmd " << subcmd << std::endl;
         return 0;
     }
 
-    if (subcmd == "allocate_orelse_reserve") {
+    if (subcmd == "allocate_orelse_reserve")
+    {
         orelse_reserve = true;
     }
 
-
-    uint64_t jobid = ctx.get_job_counter ();
-    std::string &jobspec_fn = args[2];
-    std::ifstream jobspec_in (jobspec_fn);
-    if (!jobspec_in) {
+    uint64_t jobid = ctx.get_job_counter();
+    std::ifstream jobspec_in(jobspec_fn);
+    if (!jobspec_in)
+    {
         std::cerr << "ERROR: can't open " << jobspec_fn << std::endl;
         return 0;
     }
-    std::string jobspec ( (std::istreambuf_iterator<char> (jobspec_in) ),
-                        (std::istreambuf_iterator<char> () ) );
+    std::string jobspec((std::istreambuf_iterator<char>(jobspec_in)),
+                        (std::istreambuf_iterator<char>()));
+    jobspec_in.close();
 
-    rc = reapi_cli_t::match_allocate (&ctx, orelse_reserve, jobspec, jobid, reserved, R, at, ov);
+    rc = reapi_cli_t::match_allocate(&ctx, orelse_reserve, jobspec, jobid, reserved, R, at, ov);
 
     if ((rc != 0) && (errno == ENODEV))
         sat = false;
 
-    elapse = get_elapsed_time (st, et);
+    elapse = get_elapsed_time(st, et);
 
     out << R;
 
-    if ( (rc = gettimeofday (&et, NULL)) < 0) {
-        std::cerr << "ERROR: gettimeofday: " << strerror (errno) << std::endl;
+    if ((rc = gettimeofday(&et, NULL)) < 0)
+    {
+        std::cerr << "ERROR: gettimeofday: " << strerror(errno) << std::endl;
         return 0;
     }
 
     if (subcmd != "satisfiability")
-        print_schedule_info (ctx, out, jobid,
-                             jobspec_fn, rc == 0, at, sat,
-                             elapse);
-
-    jobspec_in.close ();
+        print_schedule_info(ctx, out, jobid,
+                            jobspec_fn, rc == 0, at, sat,
+                            elapse);
 
     return rc;
 }
 
-int match_multi (resource_query_t &ctx, std::vector<std::string> &args)
+int match(resource_query_t &ctx, std::vector<std::string> &args)
 {
-    int rc = -1;
-    int64_t at = 0;
-    bool orelse_reserve = false;
-    bool reserved = false;
-    bool sat = true;
-    std::string R = "";
-    double ov = 0.0;
-    double elapse = 0.0f;
-    std::stringstream o;
-    std::ostream &out = std::cout;
-    struct timeval st, et;
-
-    if ( (rc = gettimeofday (&st, NULL)) < 0) {
-        std::cerr << "ERROR: gettimeofday: " << strerror (errno) << std::endl;
-        return 0;
-    }
-
-    if (args.size () <= 3) {
+    if (args.size() != 3)
+    {
         std::cerr << "ERROR: malformed command" << std::endl;
         return 0;
     }
+
     std::string subcmd = args[1];
-    if (!(subcmd == "allocate" || subcmd == "allocate_orelse_reserve"
-          || subcmd == "allocate_with_satisfiability"
-          || subcmd == "satisfiability")) {
-        std::cerr << "ERROR: unknown subcmd " << args[1] << std::endl;
+    std::string jobspec_fn = args[2];
+    return execute_allocate(ctx, args, subcmd, jobspec_fn);
+}
+
+int match_multi(resource_query_t &ctx, std::vector<std::string> &args)
+{
+    if (args.size() <= 3)
+    {
+        std::cerr << "ERROR: malformed command" << std::endl;
         return 0;
     }
 
-    if (subcmd == "allocate_orelse_reserve") {
-        orelse_reserve = true;
-    }
-
-    for (int i = 2; i < args.size (); i++) {
-        uint64_t jobid = ctx.get_job_counter ();
-        std::string &jobspec_fn = args[i];
-        std::ifstream jobspec_in (jobspec_fn);
-        if (!jobspec_in) {
-            std::cerr << "ERROR: can't open " << jobspec_fn << std::endl;
-            return 0;
-        }
-        std::string jobspec ( (std::istreambuf_iterator<char> (jobspec_in) ),
-                            (std::istreambuf_iterator<char> () ) );
-
-        jobspec_in.close ();
-
-        rc = reapi_cli_t::match_allocate (&ctx, orelse_reserve, jobspec, jobid, reserved, R, at, ov);
-
-        if ((rc != 0) && (errno == ENODEV))
-            sat = false;
-
-        elapse = get_elapsed_time (st, et);
-
-        out << R;
-
-        if ( (rc = gettimeofday (&et, NULL)) < 0) {
-            std::cerr << "ERROR: gettimeofday: " << strerror (errno) << std::endl;
-            return 0;
-        }
-
-        if (subcmd != "satisfiability")
-            print_schedule_info (ctx, out, jobid,
-                                jobspec_fn, rc == 0, at, sat,
-                                elapse);
-
-        
-
+    std::string subcmd = args[1];
+    std::string jobspec_fn;
+    for (int i = 2; i < static_cast<int> (args.size()); i++)
+    {
+        jobspec_fn = args[i];
+        int rc = execute_allocate(ctx, args, subcmd, jobspec_fn);
         if (rc < 0)
             return 0;
     }
+
+    return 0;
+}
+
+int find (resource_query_t &ctx, std::vector<std::string> &args)
+{
+    int rc = -1;
+    int i = 0;
+    json_t *o = nullptr;
+    char *json_str = nullptr;
+
+    if (args.size () < 2) {
+        std::cerr << "ERROR: malformed command: " << std::endl;
+        return 0;
+    }
+    std::ostream &out = std::cout;
+    std::string criteria = args[1];
+    for (int i = 2; i < static_cast<int> (args.size()); ++i)
+        criteria += " " + args[i];
+
+    reapi_cli_t::find(&ctx, criteria, o);
+    if (o) {
+        if (json_is_string (o)) {
+            out << json_string_value (o);
+        } else if (!(json_str = json_dumps (o, JSON_INDENT (0)))) {
+            json_decref (o);
+            o = NULL;
+            errno = ENOMEM;
+            return 0;
+
+        } else if (json_str) {
+            out << json_str << std::endl;
+            free (json_str);
+        }
+        json_decref (o);
+    }
+    out << "INFO:" << " =============================" << std::endl;
+    out << "INFO:" << " EXPRESSION=\"" << criteria << "\"" << std::endl;
+    out << "INFO:" << " =============================" << std::endl;
 
     return 0;
 }
