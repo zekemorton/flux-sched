@@ -58,6 +58,7 @@ int reapi_cli_t::match_allocate (void *h, bool orelse_reserve,
 {
     resource_query_t *rq = static_cast<resource_query_t *> (h);
     int rc = -1;
+    int rc2 = 0;
     at = 0;
     ov = 0.0f;
     job_lifecycle_t st;
@@ -76,11 +77,11 @@ int reapi_cli_t::match_allocate (void *h, bool orelse_reserve,
         }
 
         if (orelse_reserve)
-            rc = rq->traverser_run (job,
+            rc2 = rq->traverser_run (job,
                                 match_op_t::MATCH_ALLOCATE_ORELSE_RESERVE,
                                 (int64_t)jobid, at);
         else
-            rc = rq->traverser_run (job, match_op_t::MATCH_ALLOCATE, 
+            rc2 = rq->traverser_run (job, match_op_t::MATCH_ALLOCATE, 
                                     (int64_t)jobid, at);
 
         if (rq->get_traverser_err_msg () != "") {
@@ -117,7 +118,16 @@ int reapi_cli_t::match_allocate (void *h, bool orelse_reserve,
         rq->set_reservation (jobid); 
     else
         rq->set_allocation (jobid);
- 
+
+    if ( (rc = gettimeofday (&end_time, NULL)) < 0) {
+        m_err_msg += __FUNCTION__;
+        m_err_msg += ": ERROR: gettimeofday: "
+                      + std::string (strerror (errno)) + "\n";
+        goto out;
+    }
+
+    ov = get_elapsed_time (start_time, end_time);
+
     job_info = std::make_shared<job_info_t> (jobid, st, at, "", "", ov); 
     if (job_info == nullptr) {
         errno = ENOMEM; 
@@ -131,17 +141,8 @@ int reapi_cli_t::match_allocate (void *h, bool orelse_reserve,
     rq->set_job (jobid, job_info); 
     rq->incr_job_counter ();
                          
-    if ( (rc = gettimeofday (&end_time, NULL)) < 0) {
-        m_err_msg += __FUNCTION__;
-        m_err_msg += ": ERROR: gettimeofday: "
-                      + std::string (strerror (errno)) + "\n";
-        goto out;
-    }
-
-    ov = get_elapsed_time (start_time, end_time);
-
 out:
-    return rc;
+    return rc + rc2;
 }
 
 int reapi_cli_t::update_allocate (void *h, const uint64_t jobid,
@@ -231,6 +232,24 @@ int reapi_cli_t::info (void *h, const uint64_t jobid, std::string &mode,
     at = info->scheduled_at;
     ov = info->overhead;
 
+    return 0;
+}
+
+int reapi_cli_t::update_info_jobspec_fn (void *h, const uint64_t jobid,
+                                         const std::string &jobspec_fn)
+{
+    resource_query_t *rq = static_cast<resource_query_t *> (h);
+    std::shared_ptr<job_info_t> info = nullptr;
+
+    if ( !(rq->job_exists (jobid))) {
+       m_err_msg += __FUNCTION__;
+       m_err_msg += ": ERROR: nonexistent job "
+                     + std::to_string (jobid) + "\n";
+       return -1;
+    }
+
+    info = rq->get_job (jobid);
+    info->jobspec_fn = jobspec_fn;
     return 0;
 }
 

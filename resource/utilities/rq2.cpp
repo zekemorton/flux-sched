@@ -246,13 +246,7 @@ static void print_schedule_info (resource_query_t &ctx,
 
         out << "INFO:" << " =============================" << std::endl;
         st = (at == 0)? job_lifecycle_t::ALLOCATED : job_lifecycle_t::RESERVED;
-        // ctx->jobs[jobid] = std::make_shared<job_info_t> (jobid, st, at,
-        //                                                  jobspec_fn,
-        //                                                  "", elapse);
-        // if (at == 0)
-        //     ctx->allocations[jobid] = jobid;
-        // else
-        //     ctx->reservations[jobid] = jobid;
+        reapi_cli_t::update_info_jobspec_fn(&ctx, jobid, jobspec_fn);
     } else {
         out << "INFO:" << " =============================" << std::endl;
         out << "INFO: " << "No matching resources found" << std::endl;
@@ -275,26 +269,24 @@ static void print_schedule_info (resource_query_t &ctx,
 int match (resource_query_t &ctx, std::vector<std::string> &args)
 {
     int rc = 0;
-    int rc2 = 0;
     int64_t at = 0;
     bool orelse_reserve = false;
     bool reserved = false;
     bool sat = true;
     std::string R = "";
     double ov = 0.0;
-    double elapse = 0.0f;
     std::stringstream o;
     std::ostream &out = std::cout;
     struct timeval st, et;
 
-    if ( (rc = gettimeofday (&st, NULL)) < 0) {
+    if ( (gettimeofday (&st, NULL)) < 0) {
         std::cerr << "ERROR: gettimeofday: " << strerror (errno) << std::endl;
-        return rc;
+        return 0;
     }
 
-    if (rc = args.size () != 3) {
+    if (args.size () != 3) {
         std::cerr << "ERROR: malformed command" << std::endl;
-        return rc;
+        return 0;
     }
     std::string subcmd = args[1];
     if (!(subcmd == "allocate" || subcmd == "allocate_orelse_reserve"
@@ -308,7 +300,6 @@ int match (resource_query_t &ctx, std::vector<std::string> &args)
         orelse_reserve = true;
     }
 
-
     uint64_t jobid = ctx.get_job_counter ();
     std::string &jobspec_fn = args[2];
     std::ifstream jobspec_in (jobspec_fn);
@@ -319,9 +310,9 @@ int match (resource_query_t &ctx, std::vector<std::string> &args)
     std::string jobspec ( (std::istreambuf_iterator<char> (jobspec_in) ),
                         (std::istreambuf_iterator<char> () ) );
 
-    rc2 = reapi_cli_t::match_allocate (&ctx, orelse_reserve, jobspec, jobid, reserved, R, at, ov);
+    rc = reapi_cli_t::match_allocate (&ctx, orelse_reserve, jobspec, jobid, reserved, R, at, ov);
 
-    if ((rc2 != 0) && (errno == ENODEV))
+    if ((rc != 0) && (errno == ENODEV))
         sat = false;
     
     if (reapi_cli_t::get_err_message () != "") {
@@ -329,24 +320,21 @@ int match (resource_query_t &ctx, std::vector<std::string> &args)
         reapi_cli_t::clear_err_message ();
     }
 
-    elapse = get_elapsed_time (st, et);
-
     out << R;
 
-    if ( (rc = gettimeofday (&et, NULL)) < 0) {
+    if ( (gettimeofday (&et, NULL)) < 0) {
         std::cerr << "ERROR: gettimeofday: " << strerror (errno) << std::endl;
         return 0;
     }
 
     if (subcmd != "satisfiability")
         print_schedule_info (ctx, out, jobid,
-                             jobspec_fn, rc2 == 0, at, sat,
-                             elapse);
+                             jobspec_fn, rc == 0, at, sat,
+                             ov);
 
     jobspec_in.close ();
 
-done:
-    return rc + rc2;
+    return 0;
 }
 
 int cancel (resource_query_t &ctx, std::vector<std::string> &args)
@@ -614,17 +602,13 @@ int main (int argc, char *argv[])
 {
     json_t *json_options = json_object ();
     std::string rgraph;
+    resource_query_t *ctx = nullptr;
+    int match_out, info_out = 0;
+    std::string options;
 
     process_args (json_options, argc, argv);
     get_rgraph (rgraph, json_options);
-
-
-    std::string options = json_dumps (json_options, JSON_COMPACT);
-
-    std::cout << options << std::endl;
-
-    resource_query_t *ctx = nullptr;
-    int match_out, info_out = 0;
+    options = json_dumps (json_options, JSON_COMPACT);
 
     try {
         ctx = new resource_query_t (rgraph, options);

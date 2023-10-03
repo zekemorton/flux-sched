@@ -141,6 +141,8 @@ public:
     static int find (void *h, std::string criteria, json_t *&o );
     static int info (void *h, const uint64_t jobid, std::string &mode,
                      bool &reserved, int64_t &at, double &ov);
+    static int update_info_jobspec_fn (void *h, const uint64_t jobid,
+                                       const std::string &jobspec_fn);
     static int stat (void *h, int64_t &V, int64_t &E,int64_t &J,
                      double &load, double &min, double &max, double &avg);
     static const std::string &get_err_message ();
