@@ -69,7 +69,7 @@ int reapi_cli_initialize (reapi_cli_ctx_t *ctx, const char *rgraph,
  *                   the match operation.
  *  \return          0 on success; -1 on error.
  */
-int reapi_cli_match (reapi_cli_ctx_t *ctx, const char *match_op,
+int reapi_cli_match (reapi_cli_ctx_t *ctx, match_op_t match_op,
                      const char *jobspec, uint64_t *jobid,
                      bool *reserved,
                      char **R, int64_t *at, double *ov);

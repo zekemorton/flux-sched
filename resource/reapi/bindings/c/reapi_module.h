@@ -37,7 +37,7 @@ void reapi_module_destroy (reapi_module_ctx_t *ctx);
  *  the selected match policy.
  *
  *  \param ctx       reapi_module_ctx_t context object
- *  \param match_op  const char *: set to specify the specific match option
+ *  \param match_op  match_op_t: set to specify the specific match option
  *                   from 1 of 4 choices:
  *                   allocate: try to allocate now and fail if resources 
  *                   aren't available. 
@@ -60,10 +60,10 @@ void reapi_module_destroy (reapi_module_ctx_t *ctx);
  *                   the match operation.
  *  \return          0 on success; -1 on error.
  */
-int reapi_module_match (reapi_module_ctx_t *ctx, const char *match_op,
-                                 const char *jobspec, const uint64_t jobid,
-                                 bool *reserved,
-                                 char **R, int64_t *at, double *ov);
+int reapi_module_match (reapi_module_ctx_t *ctx, match_op_t match_op,
+                        const char *jobspec, const uint64_t jobid,
+                        bool *reserved,
+                        char **R, int64_t *at, double *ov);
 
 /*! Match a jobspec to the "best" resources and either allocate
  *  orelse reserve them. The best resources are determined by

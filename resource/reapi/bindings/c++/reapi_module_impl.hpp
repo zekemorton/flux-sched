@@ -25,7 +25,7 @@ namespace Flux {
 namespace resource_model {
 namespace detail {
 
-int reapi_module_t::match_allocate (void *h, const char *cmd,
+int reapi_module_t::match_allocate (void *h, match_op_t match_op,
                                     const std::string &jobspec,
                                     const uint64_t jobid, bool &reserved,
                                     std::string &R, int64_t &at, double &ov)
@@ -36,6 +36,7 @@ int reapi_module_t::match_allocate (void *h, const char *cmd,
     flux_future_t *f = NULL;
     const char *rset = NULL;
     const char *status = NULL;
+    const char *cmd = match_op_to_string (match_op);
 
     if (!fh || jobspec == "" || jobid > INT64_MAX) {
         errno = EINVAL;
@@ -73,10 +74,10 @@ int reapi_module_t::match_allocate (void *h, bool orelse_reserve,
                                     const uint64_t jobid, bool &reserved,
                                     std::string &R, int64_t &at, double &ov)
 {
-    const char *cmd = (orelse_reserve)? "allocate_orelse_reserve"
-                                      : "allocate_with_satisfiability";
+    match_op_t match_op = (orelse_reserve)? match_op_t::MATCH_ALLOCATE_ORELSE_RESERVE
+                                       : match_op_t::MATCH_ALLOCATE_W_SATISFIABILITY;
     
-    return match_allocate (h, cmd, jobspec, jobid, reserved, R, at, ov); 
+    return match_allocate (h, match_op, jobspec, jobid, reserved, R, at, ov); 
 
 }
 
