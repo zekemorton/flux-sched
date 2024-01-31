@@ -343,7 +343,6 @@ bool matcher_util_api_t::is_resource_type_exclusive (const std::string &type)
     return m_x_resource_types.find (type) != m_x_resource_types.end ();
 }
 
-
 } // resource_model
 } // Flux
 /*

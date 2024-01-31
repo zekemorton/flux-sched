@@ -19,6 +19,7 @@ extern "C" {
 #include "config.h"
 #endif
 #include <flux/core.h>
+#include "resource/policies/base/match_op.h"
 
 typedef struct reapi_module_ctx reapi_module_ctx_t;
 

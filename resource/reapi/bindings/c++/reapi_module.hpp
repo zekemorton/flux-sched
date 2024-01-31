@@ -21,12 +21,13 @@ extern "C" {
 #include <cstdint>
 #include <string>
 #include "resource/reapi/bindings/c++/reapi.hpp"
-#include "resource/policies/base/matcher.hpp"
+#include "resource/policies/base/match_op.h"
 
 namespace Flux {
 namespace resource_model {
 namespace detail {
 
+// const char *match_op_to_string (match_op_t match_op);
 class reapi_module_t : public reapi_t {
 public:
     static int match_allocate (void *h, match_op_t match_op,
