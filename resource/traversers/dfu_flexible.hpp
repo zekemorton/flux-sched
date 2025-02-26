@@ -55,7 +55,6 @@ class dfu_flexible_t : public dfu_impl_t {
 
     int match (vtx_t u,
                const std::vector<Jobspec::Resource> &resources,
-               const Jobspec::Resource **slot_resource,
                unsigned int *nslots,
                const Jobspec::Resource **match_resource,
                const std::vector<Jobspec::Resource> **slot_resources);

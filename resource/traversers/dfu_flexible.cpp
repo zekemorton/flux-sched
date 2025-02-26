@@ -34,7 +34,6 @@ dfu_flexible_t::~dfu_flexible_t () = default;
 
 int dfu_flexible_t::match (vtx_t u,
                            const std::vector<Resource> &resources,
-                           const Resource **slot_resource,
                            unsigned int *nslots,
                            const Resource **match_resource,
                            const std::vector<Resource> **slot_resources)
@@ -97,25 +96,24 @@ const std::vector<Resource> &dfu_flexible_t::test (vtx_t u,
      */
     bool slot = true;
     const std::vector<Resource> *ret = &resources;
-    const Resource *slot_resources = NULL;
     const Resource *match_resources = NULL;
-    const std::vector<Resource> *slot_or_resources = NULL;
-    if (match (u, resources, &slot_resources, &nslots, &match_resources, &slot_or_resources) < 0) {
+    const std::vector<Resource> *slot_resources = NULL;
+    if (match (u, resources, &nslots, &match_resources, &slot_resources) < 0) {
         m_err_msg += __FUNCTION__;
         m_err_msg += ": siblings in jobspec request same resource type ";
         m_err_msg += ": " + (*m_graph)[u].type + ".\n";
         spec = match_kind_t::NONE_MATCH;
         goto done;
     }
-    if ((slot_or_resources)) {
+    if ((slot_resources)) {
         // set default spec in case no match is found
         spec = pristine ? match_kind_t::PRISTINE_NONE_MATCH : match_kind_t::NONE_MATCH;
 
-        for (Resource r : *slot_or_resources) {
+        for (Resource r : *slot_resources) {
             if ((slot_match (u, &r))) {
                 spec = match_kind_t::SLOT_MATCH;
                 pristine = false;
-                ret = slot_or_resources;
+                ret = slot_resources;
             }
         }
     } else if (match_resources) {
