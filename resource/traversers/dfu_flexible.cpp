@@ -196,6 +196,12 @@ std::tuple<std::map<resource_type_t, int>, int, int> dfu_flexible_t::select_or_c
     if (it != or_config.end ())
         return it->second;
 
+    // if there is only a single slot, no need to compute
+    if (slots.size () == 1) {
+        or_config[index] = std::make_tuple (resource_counts, nslots, 0);
+        return or_config[index];
+    }
+
     for (auto slot : slots) {
         int test;
         ++i;
