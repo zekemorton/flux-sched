@@ -178,6 +178,22 @@ class dfu_impl_t {
     virtual void prime_jobspec (std::vector<Jobspec::Resource> &resources,
                                 std::unordered_map<resource_type_t, int64_t> &to_parent);
 
+    /*! Execute the shared select walk for a single concrete resource list.
+     *  This handles traversal, graph resolution, and updating the root
+     *  bookkeeping when a match succeeds.
+     *
+     *  \param root      root resource vertex.
+     *  \param resources fully expanded resource request vector.
+     *  \param meta      metadata on this job.
+     *  \param exclusive true if exclusive access is requested for root.
+     *  \return          0 on success; -1 on error -- call err_message ()
+     *                   for detail.
+     */
+    int select_resources (vtx_t root,
+                          std::vector<Jobspec::Resource> &resources,
+                          jobmeta_t &meta,
+                          bool exclusive);
+
     /*! Extract the aggregate info in the lookup object as pertaining to the
      *  planner-tracking resource types into resource_counts array, a form that
      *  can be used with Planner API.
@@ -214,7 +230,7 @@ class dfu_impl_t {
      *  \return          0 on success; -1 on error -- call err_message ()
      *                   for detail.
      */
-    int select (Jobspec::Jobspec &jobspec, vtx_t root, jobmeta_t &meta, bool exclusive);
+    virtual int select (Jobspec::Jobspec &jobspec, vtx_t root, jobmeta_t &meta, bool exclusive);
 
     /*! Traverse the resource graph and emit those resources whose
      *  status is matched with the matching criteria.
