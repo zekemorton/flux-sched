@@ -209,8 +209,14 @@ int dfu_flexible_t::select (std::vector<Jobspec::Resource> &resources,
     }
 
     for (auto &variant : xor_resources) {
-        if (dfu_impl_t::select (variant, root, meta, excl) == 0) {
-            // Success - update the passed resources to the matching variant
+        // Each variant gets a fresh copy of the metadata with the system
+        // attribute overrides registered for its label (if any) applied, so
+        // that a failed attempt cannot leak overrides into the next variant.
+        jobmeta_t variant_meta = meta;
+        variant_meta.apply_xor_label (extract_variant_label (variant, meta));
+
+        if (dfu_impl_t::select (variant, root, variant_meta, excl) == 0) {
+            meta = variant_meta;
             resources = variant;
             return 0;
         }
@@ -303,6 +309,25 @@ bool dfu_flexible_t::exceeds_max_expansion (size_t size) const
         return true;
     }
     return false;
+}
+
+std::string dfu_flexible_t::extract_variant_label (const std::vector<Jobspec::Resource> &resources,
+                                                   const jobmeta_t &meta) const
+{
+    // Every slot carries a label (RFC 14), so only labels registered in the
+    // attributes.xor section select an override.  By the time this runs,
+    // split_xor_slots has rewritten each xor_slot into a plain slot, so the
+    // chosen branch is identified by the slot label that appears in
+    // meta.xor_attrs.
+    for (const auto &resource : resources) {
+        if (resource.type == slot_rt
+            && meta.xor_attrs.find (resource.label) != meta.xor_attrs.end ())
+            return resource.label;
+        std::string label = extract_variant_label (resource.with, meta);
+        if (!label.empty ())
+            return label;
+    }
+    return "";
 }
 
 std::tuple<dfu_flexible_t::Key, int, int> dfu_flexible_t::select_or_config (

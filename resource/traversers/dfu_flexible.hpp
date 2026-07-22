@@ -113,6 +113,13 @@ class dfu_flexible_t : public dfu_impl_t {
     std::vector<std::vector<Jobspec::Resource>> split_xor_slots (
         const std::vector<Jobspec::Resource> &resources) const;
 
+    /*! Return the slot label identifying the xor branch of an expanded
+     *  variant, i.e., the first slot label with an entry in meta.xor_attrs.
+     *  Return an empty string if the variant carries no labeled overrides.
+     */
+    std::string extract_variant_label (const std::vector<Jobspec::Resource> &resources,
+                                       const jobmeta_t &meta) const;
+
     bool exceeds_max_expansion (size_t size) const;
 
     int prune_resources (const jobmeta_t &meta,
