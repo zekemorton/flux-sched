@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include "resource/libjobspec/jobspec.hpp"
 #include "resource/config/system_defaults.hpp"
 #include "resource/schema/resource_data.hpp"
@@ -41,12 +42,24 @@ struct jobmeta_t {
         AT_SATISFIABILITY = 2
     };
 
+    /*! Per-label overrides of system attributes parsed from the
+     *  attributes.xor section of a jobspec.  The flexible traverser
+     *  applies the override whose label matches the xor_slot branch
+     *  being attempted (see dfu_flexible_t::select).
+     */
+    struct xor_attrs_t {
+        int64_t duration = -1;                            // -1: inherit the jobspec-level duration
+        std::string queue;                                // empty: inherit the jobspec-level queue
+        std::shared_ptr<Jobspec::Constraint> constraint;  // nullptr: inherit
+    };
+
     alloc_type_t alloc_type = alloc_type_t::AT_ALLOC;
     int64_t jobid = -1;
     int64_t at = -1;
     int64_t now = -1;
     int64_t duration = SYSTEM_DEFAULT_DURATION;  // will need config ultimately
     std::shared_ptr<Jobspec::Constraint> constraint;
+    std::unordered_map<std::string, xor_attrs_t> xor_attrs;
 
     bool is_queue_set () const
     {
@@ -56,6 +69,32 @@ struct jobmeta_t {
     const std::string &get_queue () const
     {
         return m_queue;
+    }
+
+    /*! Overlay the system attributes registered for label onto this
+     *  metadata.  A no-op if the label has no registered override.
+     *  Must be applied to a copy of the metadata built by build () --
+     *  once applied, the jobspec-level values are lost.
+     */
+    void apply_xor_label (const std::string &label)
+    {
+        auto it = xor_attrs.find (label);
+        if (it == xor_attrs.end ())
+            return;
+        if (it->second.duration >= 0) {
+            // The satisfiability probe time was derived from the
+            // jobspec-level duration; shift it so at + duration still
+            // lands just before the end of the planner span.
+            if (alloc_type == alloc_type_t::AT_SATISFIABILITY)
+                at += duration - it->second.duration;
+            duration = it->second.duration;
+        }
+        if (!it->second.queue.empty ()) {
+            m_queue = it->second.queue;
+            m_queue_set = true;
+        }
+        if (it->second.constraint != nullptr)
+            constraint = it->second.constraint;
     }
 
     int build (Jobspec::Jobspec &jobspec,
@@ -76,14 +115,8 @@ struct jobmeta_t {
             errno = EINVAL;
             return -1;
         }
-        // Ensure that duration is shorter than expressible
-        // int64_t max () for comparison with at in dfu_traverser_t::run
-        if ((jobspec.attributes.system.duration > static_cast<double> (g_duration))
-            || (jobspec.attributes.system.duration
-                > static_cast<double> (std::numeric_limits<int64_t>::max ()))) {
-            errno = EINVAL;
+        if (validate_duration (jobspec.attributes.system.duration, g_duration) < 0)
             return -1;
-        }
         if (jobspec.attributes.system.duration == 0.0f) {
             duration = g_duration;
         } else {
@@ -94,10 +127,32 @@ struct jobmeta_t {
             m_queue_set = true;
         }
         constraint = jobspec.attributes.system.constraint;
+        for (const auto &xa : jobspec.attributes.xor_attrs) {
+            if (validate_duration (xa.system.duration, g_duration) < 0)
+                return -1;
+            xor_attrs_t attrs;
+            if (xa.system.duration != 0.0f)
+                attrs.duration = (int64_t)xa.system.duration;
+            attrs.queue = xa.system.queue;
+            attrs.constraint = xa.system.constraint;
+            xor_attrs.emplace (xa.label, std::move (attrs));
+        }
         return 0;
     }
 
    protected:
+    // Ensure that duration is shorter than expressible
+    // int64_t max () for comparison with at in dfu_traverser_t::run
+    static int validate_duration (double requested, int64_t g_duration)
+    {
+        if ((requested > static_cast<double> (g_duration))
+            || (requested > static_cast<double> (std::numeric_limits<int64_t>::max ()))) {
+            errno = EINVAL;
+            return -1;
+        }
+        return 0;
+    }
+
     bool m_queue_set = false;
     std::string m_queue = "";
 };
