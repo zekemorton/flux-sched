@@ -308,9 +308,41 @@ std::vector<Resource> parse_yaml_resources (const YAML::Node &resources)
 
     return resvec;
 }
+
+bool label_matches_xor_slot (const std::vector<Resource> &resources, const std::string &label)
+{
+    for (const auto &resource : resources) {
+        if (resource.type == Flux::resource_model::xor_slot_rt && resource.label == label)
+            return true;
+        if (label_matches_xor_slot (resource.with, label))
+            return true;
+    }
+    return false;
+}
 }  // namespace
 
 namespace {
+void parse_yaml_system (const YAML::Node &snode, System &system)
+{
+    for (auto &&s : snode) {
+        if (s.first.as<std::string> () == "duration") {
+            system.duration = s.second.as<double> ();
+        } else if (s.first.as<std::string> () == "queue") {
+            system.queue = s.second.as<std::string> ();
+        } else if (s.first.as<std::string> () == "cwd") {
+            system.cwd = s.second.as<std::string> ();
+        } else if (s.first.as<std::string> () == "environment") {
+            for (auto &&e : s.second) {
+                system.environment[e.first.as<std::string> ()] = e.second.as<std::string> ();
+            }
+        } else if (s.first.as<std::string> () == "constraints") {
+            system.constraint = constraint_parser (s.second);
+        } else {
+            system.optional[s.first.as<std::string> ()] = s.second;
+        }
+    }
+}
+
 Attributes parse_yaml_attributes (const YAML::Node &attrs)
 {
     Attributes a;
@@ -322,23 +354,36 @@ Attributes parse_yaml_attributes (const YAML::Node &attrs)
         if (kv.first.as<std::string> () == "user") {
             a.user = kv.second;
         } else if (kv.first.as<std::string> () == "system") {
-            for (auto &&s : kv.second) {
-                if (s.first.as<std::string> () == "duration") {
-                    a.system.duration = s.second.as<double> ();
-                } else if (s.first.as<std::string> () == "queue") {
-                    a.system.queue = s.second.as<std::string> ();
-                } else if (s.first.as<std::string> () == "cwd") {
-                    a.system.cwd = s.second.as<std::string> ();
-                } else if (s.first.as<std::string> () == "environment") {
-                    for (auto &&e : s.second) {
-                        a.system.environment[e.first.as<std::string> ()] =
-                            e.second.as<std::string> ();
-                    }
-                } else if (s.first.as<std::string> () == "constraints") {
-                    a.system.constraint = constraint_parser (s.second);
-                } else {
-                    a.system.optional[s.first.as<std::string> ()] = s.second;
+            parse_yaml_system (kv.second, a.system);
+        } else if (kv.first.as<std::string> () == "xor") {
+            if (!kv.second.IsSequence ()) {
+                throw parse_error (kv.second, "\"xor\" in attributes must be a sequence");
+            }
+            for (auto &&xnode : kv.second) {
+                if (!xnode.IsMap ()) {
+                    throw parse_error (xnode, "xor attributes entry must be a mapping");
                 }
+                if (!xnode["label"]) {
+                    throw parse_error (xnode, "xor attributes entry must have a \"label\" key");
+                }
+                if (!xnode["label"].IsScalar ()) {
+                    throw parse_error (xnode["label"], "Value of \"label\" must be a scalar");
+                }
+                if (!xnode["system"]) {
+                    throw parse_error (xnode, "xor attributes entry must have a \"system\" key");
+                }
+                if (xnode.size () != 2) {
+                    throw parse_error (xnode, "Unrecognized key in xor attributes entry");
+                }
+                XorAttributes xa;
+                xa.label = xnode["label"].as<std::string> ();
+                for (const auto &prev : a.xor_attrs) {
+                    if (prev.label == xa.label) {
+                        throw parse_error (xnode["label"], "Duplicate label in xor attributes");
+                    }
+                }
+                parse_yaml_system (xnode["system"], xa.system);
+                a.xor_attrs.push_back (std::move (xa));
             }
         } else {
             throw parse_error (kv.second, "Unknown key in \"attributes\"");
@@ -388,6 +433,14 @@ Jobspec::Jobspec (const YAML::Node &top)
 
         /* Import resources section */
         resources = parse_yaml_resources (top["resources"]);
+
+        /* Each xor attributes label must name an xor_slot in resources */
+        for (const auto &xa : attributes.xor_attrs) {
+            if (!label_matches_xor_slot (resources, xa.label)) {
+                throw parse_error (top["attributes"],
+                                   "xor attributes label does not match any xor_slot label");
+            }
+        }
 
         /* Import tasks section */
         tasks = parse_yaml_tasks (top["tasks"]);
@@ -485,6 +538,29 @@ std::ostream &Flux::Jobspec::operator<< (std::ostream &s, Jobspec const &jobspec
         ss << jobspec.attributes.system.constraint->as_yaml ();
         while (std::getline (ss, line))
             s << "      " << line << std::endl;
+    }
+    if (!jobspec.attributes.xor_attrs.empty ()) {
+        s << "  "
+          << "xor:" << std::endl;
+        for (auto &&xa : jobspec.attributes.xor_attrs) {
+            s << "    - label: " << xa.label << std::endl;
+            s << "      system:" << std::endl;
+            s << "        duration: " << xa.system.duration << std::endl;
+            s << "        cwd: " << xa.system.cwd << std::endl;
+            s << "        queue: " << xa.system.queue << std::endl;
+            s << "        environment:" << std::endl;
+            for (auto &&e : xa.system.environment) {
+                s << "          " << e.first << ": " << e.second << std::endl;
+            }
+            s << "        constraints:" << std::endl;
+            if (xa.system.constraint != nullptr) {
+                std::stringstream ss;
+                std::string line;
+                ss << xa.system.constraint->as_yaml ();
+                while (std::getline (ss, line))
+                    s << "          " << line << std::endl;
+            }
+        }
     }
     return s;
 }

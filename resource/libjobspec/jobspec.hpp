@@ -94,9 +94,19 @@ struct System {
     System &operator= (System &&a) = default;
 };
 
+struct XorAttributes {
+    std::string label;
+    System system;
+
+    XorAttributes () = default;
+    XorAttributes (XorAttributes &&) = default;
+    XorAttributes &operator= (XorAttributes &&) = default;
+};
+
 struct Attributes {
     YAML::Node user;
     System system;
+    std::vector<XorAttributes> xor_attrs;
 
     Attributes () = default;
     Attributes (const Attributes &a) = delete;  // Force to use move ctor
