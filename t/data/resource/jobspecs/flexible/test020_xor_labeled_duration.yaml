@@ -1,0 +1,39 @@
+# Two xor_slot alternatives with per-label durations from attributes.xor:
+# the "short" branch (10 cores) runs for 500s and the "long" branch
+# (5 cores) for 1000s.  The "short" branch is satisfiable, so the
+# allocation must carry duration 500 rather than the jobspec-level 600.
+version: 9999
+resources:
+  - type: xor_slot
+    count: 1
+    label: short
+    with:
+      - type: core
+        count: 10
+      - type: memory
+        count: 4
+  - type: xor_slot
+    count: 1
+    label: long
+    with:
+      - type: core
+        count: 5
+      - type: memory
+        count: 4
+
+attributes:
+  system:
+    duration: 600
+  xor:
+    - label: short
+      system:
+        duration: 500
+    - label: long
+      system:
+        duration: 1000
+
+tasks:
+  - command: [ "app" ]
+    slot: default
+    count:
+      per_slot: 1

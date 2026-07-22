@@ -1,0 +1,20 @@
+version: 9999
+resources:
+  - type: xor_slot
+    count: 1
+    label: tuolumne
+    with:
+      - type: core
+        count: 1
+attributes:
+  system:
+    duration: 1000
+  xor:
+    - label: quartz
+      system:
+        duration: 3000
+tasks:
+  - command: ["app"]
+    slot: default
+    count:
+      per_slot: 1

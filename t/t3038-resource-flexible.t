@@ -163,4 +163,19 @@ test_expect_success "${test019_desc}" '
     test_cmp 019.R.out ${exp_dir}/019.R.out
 '
 
+cmds020="${cmd_dir}/cmds20.in"
+test020_desc="JGF: allocations of labeled xor branches carry per-label durations"
+test_expect_success "${test020_desc}" '
+    sed "s~@TEST_SRCDIR@~${SHARNESS_TEST_SRCDIR}~g" ${cmds020} > cmds020 &&
+    ${query} -L ${jgf} -f jgf -S CA -P high -T flexible -F rv1_nosched \
+        -t 020.R.out < cmds020 &&
+    grep -v "^INFO" 020.R.out \
+        | jq -r ".execution.expiration - .execution.starttime" > 020.durations &&
+    cat <<-EOF >020.expected &&
+	500
+	1000
+	EOF
+    test_cmp 020.expected 020.durations
+'
+
 test_done

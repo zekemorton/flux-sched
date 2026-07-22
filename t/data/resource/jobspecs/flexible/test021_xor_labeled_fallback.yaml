@@ -1,0 +1,35 @@
+# The first xor_slot branch requests more cores than any socket provides,
+# so the traverser must fall back to the second branch and the allocation
+# must carry that branch's duration (1000s), not the first branch's 500s
+# nor the jobspec-level 600s.
+version: 9999
+resources:
+  - type: xor_slot
+    count: 1
+    label: huge
+    with:
+      - type: core
+        count: 100
+  - type: xor_slot
+    count: 1
+    label: small
+    with:
+      - type: core
+        count: 5
+
+attributes:
+  system:
+    duration: 600
+  xor:
+    - label: huge
+      system:
+        duration: 500
+    - label: small
+      system:
+        duration: 1000
+
+tasks:
+  - command: [ "app" ]
+    slot: default
+    count:
+      per_slot: 1

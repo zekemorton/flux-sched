@@ -1,0 +1,3 @@
+match allocate @TEST_SRCDIR@/data/resource/jobspecs/flexible/test020_xor_labeled_duration.yaml
+match allocate @TEST_SRCDIR@/data/resource/jobspecs/flexible/test021_xor_labeled_fallback.yaml
+quit

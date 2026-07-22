@@ -518,4 +518,212 @@ TEST_CASE ("dfu_flexible handles empty resource list", "[resource][traversers][f
     CHECK (variants[0].empty ());
 }
 
+static const std::string xor_labeled_jobspec = R"(
+    version: 9999
+    resources:
+      - type: xor_slot
+        count: 1
+        label: tuolumne
+        with:
+          - type: core
+            count: 48
+      - type: xor_slot
+        count: 1
+        label: tioga
+        with:
+          - type: core
+            count: 36
+    attributes:
+      system:
+        duration: 3600
+        queue: batch
+      xor:
+        - label: tuolumne
+          system:
+            duration: 3000
+        - label: tioga
+          system:
+            duration: 4000
+            queue: gpu
+    tasks:
+      - command: [ "app" ]
+        slot: default
+        count:
+          per_slot: 1
+)";
+
+static jobmeta_t build_meta (Jobspec &js)
+{
+    jobmeta_t meta;
+    graph_duration_t graph_duration;
+    REQUIRE (meta.build (js, jobmeta_t::alloc_type_t::AT_ALLOC, 1, 0, graph_duration) == 0);
+    return meta;
+}
+
+TEST_CASE ("jobspec parses xor labeled attributes", "[resource][jobspec][flexible]")
+{
+    Jobspec js (xor_labeled_jobspec);
+
+    CHECK (js.attributes.system.duration == 3600);
+
+    REQUIRE (js.attributes.xor_attrs.size () == 2);
+    CHECK (js.attributes.xor_attrs[0].label == "tuolumne");
+    CHECK (js.attributes.xor_attrs[0].system.duration == 3000);
+    CHECK (js.attributes.xor_attrs[0].system.queue.empty ());
+    CHECK (js.attributes.xor_attrs[1].label == "tioga");
+    CHECK (js.attributes.xor_attrs[1].system.duration == 4000);
+    CHECK (js.attributes.xor_attrs[1].system.queue == "gpu");
+}
+
+TEST_CASE ("jobspec rejects malformed xor labeled attributes", "[resource][jobspec][flexible]")
+{
+    SECTION ("duplicate label")
+    {
+        std::string yaml = xor_labeled_jobspec;
+        auto pos = yaml.find ("label: tioga\n          system");
+        REQUIRE (pos != std::string::npos);
+        yaml.replace (pos, 12, "label: tuolumne");
+        CHECK_THROWS_AS (Jobspec (yaml), Flux::Jobspec::parse_error);
+    }
+
+    SECTION ("label matching no xor_slot")
+    {
+        std::string yaml = xor_labeled_jobspec;
+        auto pos = yaml.find ("label: tioga\n          system");
+        REQUIRE (pos != std::string::npos);
+        yaml.replace (pos, 12, "label: quartz");
+        CHECK_THROWS_AS (Jobspec (yaml), Flux::Jobspec::parse_error);
+    }
+
+    SECTION ("missing label key")
+    {
+        std::string yaml = xor_labeled_jobspec;
+        auto pos = yaml.find ("- label: tuolumne\n          system:\n            duration: 3000");
+        REQUIRE (pos != std::string::npos);
+        yaml.replace (pos, std::string ("- label: tuolumne").size (), "- unlabeled: tuolumne");
+        CHECK_THROWS_AS (Jobspec (yaml), Flux::Jobspec::parse_error);
+    }
+}
+
+TEST_CASE ("jobmeta_t registers and applies xor labeled attributes",
+           "[resource][traversers][flexible]")
+{
+    Jobspec js (xor_labeled_jobspec);
+    jobmeta_t meta = build_meta (js);
+
+    REQUIRE (meta.xor_attrs.size () == 2);
+    CHECK (meta.duration == 3600);
+    CHECK (meta.get_queue () == "batch");
+
+    SECTION ("label with duration override")
+    {
+        meta.apply_xor_label ("tuolumne");
+        CHECK (meta.duration == 3000);
+        CHECK (meta.get_queue () == "batch");
+    }
+
+    SECTION ("label with duration and queue overrides")
+    {
+        meta.apply_xor_label ("tioga");
+        CHECK (meta.duration == 4000);
+        CHECK (meta.get_queue () == "gpu");
+    }
+
+    SECTION ("unknown label inherits jobspec-level attributes")
+    {
+        meta.apply_xor_label ("quartz");
+        CHECK (meta.duration == 3600);
+        CHECK (meta.get_queue () == "batch");
+    }
+}
+
+TEST_CASE ("jobmeta_t rejects out-of-range xor labeled duration",
+           "[resource][traversers][flexible]")
+{
+    std::string yaml = xor_labeled_jobspec;
+    auto pos = yaml.find ("duration: 4000");
+    REQUIRE (pos != std::string::npos);
+    // Exceeds the default graph duration (detail::SYSTEM_MAX_DURATION)
+    yaml.replace (pos, std::string ("duration: 4000").size (), "duration: 9223372036854775807");
+
+    Jobspec js (yaml);
+    jobmeta_t meta;
+    graph_duration_t graph_duration;
+    CHECK (meta.build (js, jobmeta_t::alloc_type_t::AT_ALLOC, 1, 0, graph_duration) == -1);
+}
+
+TEST_CASE ("dfu_flexible extract_variant_label identifies labeled variants",
+           "[resource][traversers][flexible]")
+{
+    Jobspec js (xor_labeled_jobspec);
+    jobmeta_t meta = build_meta (js);
+
+    dfu_flexible_t traverser;
+    auto variants = traverser.split_xor_slots (js.resources);
+    REQUIRE (variants.size () == 2);
+
+    CHECK (traverser.extract_variant_label (variants[0], meta) == "tuolumne");
+    CHECK (traverser.extract_variant_label (variants[1], meta) == "tioga");
+}
+
+TEST_CASE ("dfu_flexible extract_variant_label finds nested labels",
+           "[resource][traversers][flexible]")
+{
+    std::string yaml_str = R"(
+        version: 9999
+        resources:
+          - type: node
+            count: 1
+            with:
+              - type: xor_slot
+                count: 1
+                label: tioga
+                with:
+                  - type: core
+                    count: 8
+        attributes:
+          system:
+            duration: 3600
+          xor:
+            - label: tioga
+              system:
+                duration: 4000
+        tasks:
+          - command: [ "app" ]
+            slot: default
+            count:
+              per_slot: 1
+    )";
+
+    Jobspec js (yaml_str);
+    jobmeta_t meta = build_meta (js);
+
+    dfu_flexible_t traverser;
+    auto variants = traverser.split_xor_slots (js.resources);
+    REQUIRE (variants.size () == 1);
+
+    CHECK (traverser.extract_variant_label (variants[0], meta) == "tioga");
+}
+
+TEST_CASE ("dfu_flexible extract_variant_label ignores slots without overrides",
+           "[resource][traversers][flexible]")
+{
+    // Slot labels are mandatory (RFC 14); only labels registered in
+    // attributes.xor should select an override.
+    auto slot = make_resource (R"(
+        type: slot
+        count: 1
+        label: default
+        with:
+          - type: core
+            count: 4
+    )");
+
+    std::vector<Resource> resources = {slot};
+    dfu_flexible_t traverser;
+    jobmeta_t meta;
+
+    CHECK (traverser.extract_variant_label (resources, meta).empty ());
+}
+
 }  // namespace

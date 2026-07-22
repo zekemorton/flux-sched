@@ -1,0 +1,29 @@
+version: 9999
+resources:
+  - type: xor_slot
+    count: 1
+    label: tuolumne
+    with:
+      - type: core
+        count: 48
+  - type: xor_slot
+    count: 1
+    label: tioga
+    with:
+      - type: core
+        count: 36
+attributes:
+  system:
+    duration: 1000
+  xor:
+    - label: tuolumne
+      system:
+        duration: 3000
+    - label: tioga
+      system:
+        duration: 4000
+tasks:
+  - command: ["app"]
+    slot: default
+    count:
+      per_slot: 1
