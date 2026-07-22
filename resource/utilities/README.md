@@ -684,6 +684,56 @@ node-scoped memory branch." The resulting branches are expanded before
 matching and then tried as separate candidate jobspecs. Nested `xor_slot`s 
 are supported by the `flexible` traverser.
 
+### Xor-Labeled System Attributes
+
+When `xor_slot` alternatives represent options with different runtime
+characteristics (e.g., different target clusters), a single
+`attributes.system.duration` cannot describe them all.  The `attributes.xor`
+section associates system attribute overrides with `xor_slot` labels:
+
+```yaml
+version: 9999
+resources:
+  - type: xor_slot
+    count: 1
+    label: tuolumne
+    with:
+      - type: core
+        count: 48
+  - type: xor_slot
+    count: 1
+    label: tioga
+    with:
+      - type: core
+        count: 36
+attributes:
+  system:
+    duration: 3600
+  xor:
+    - label: tuolumne
+      system:
+        duration: 3000
+    - label: tioga
+      system:
+        duration: 4000
+tasks:
+  - command: [ "app" ]
+    slot: default
+    count:
+      per_slot: 1
+```
+
+Each entry in `attributes.xor` must have a `label` naming an `xor_slot` in
+the resources section and a `system` mapping with the same schema as
+`attributes.system`.  When the `flexible` traverser tries an expanded xor
+branch, the entry whose label matches that branch overrides the job's
+system attributes for that attempt: currently `duration`, `queue`, and
+`constraints` take effect during matching, and the allocated or reserved
+span is created with the per-label duration.  Attributes not overridden
+(or labels without an entry) inherit the `attributes.system` values.
+Labels must be unique within `attributes.xor`, and a label that names no
+`xor_slot` is a parse error.
+
 ### Or and Xor Slot Comparison
 
 | Feature | OR-slots | XOR-slots |
